@@ -1,0 +1,135 @@
+---
+title: "bird_joins.Rmd"
+author: "Juliet"
+date: "8/17/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(here)
+library(lubridate)
+library(tidyverse)
+library(datapasta)
+```
+
+## Task 1
+
+```{r}
+bird_observations <- read_csv(here("data", "52_pp52_birds_1.csv"))
+```
+
+```{r}
+sites <- read_csv(here("data", "52_pp52_sites_1.csv"))
+```
+
+```{r}
+surveys <- read_csv(here("data", "52_pp52_surveys_1.csv"))
+```
+
+```{r}
+taxalist <- read_csv(here("data", "52_pp52_taxalist_1.csv"))
+```
+
+```{r}
+#subset
+
+birds_subset <- bird_observations %>% 
+  filter(species_id %in% c("BHCO", "RWBL")) %>% filter(site_id %in% c("LI-W", "NU-C"))
+
+
+```
+
+
+## left join practice
+
+```{r}
+birds_subset_left_sites <- left_join(birds_subset, sites, by = "site_id")
+
+#birds_subset
+
+birds_left <- left_join(birds_subset_left_sites, taxalist, by = "species_id")
+```
+
+# full join
+
+```{r}
+# full_join() between birds_subset and sites should contain the amount of obs (rows) of birds_subset with extra col that matched (with the key) from sites, plus any obs that were only in birds_subset, plus any obs that were only in sites, and these rows will have NA in the cells where they cannot pull info from the complementary dataset
+
+birds_full <- full_join(birds_subset, sites, by = "site_id")
+
+#the output is what i expected
+```
+
+## inner join
+
+```{r}
+# i expect and inner join between birds_subset and taxalist to contain only obs that have a key match in both datasets, so all observed birds will remain in the inner join as long as their species is listed on the taxa list, and the species on the taxa list will remain as long as they were obs, but if any obscure species were observed on survey they will not remain, and if any species on the taxa list were not observed on survey then they will not remain on the list
+
+birds_inner <- inner_join(birds_subset, taxalist, by = "species_id")
+
+#if I join these datasets using left_join() instead, it will tack on the extra col from taxalist to birds_subset and obs in that row will occur only for the species actually observed on survey (which is displayed in birds_subset). This makes sense for this scenario because we do not really care about names and taxa for species that we did not see. i expect the outcome to be different than that of inner_join because every single bird obs will occur, even if we dont have taxa info for it, and if we did inner join then the obs birds that we did not have taxa info for would be removed from the dataset.
+
+birds_taxalist_left <- left_join(birds_subset, taxalist, by = "species_id")
+
+```
+
+## task 2
+
+```{r}
+
+# rename the col 
+
+bird_observations_col_rename <- bird_observations %>% 
+  rename(bird_obs_notes = notes)
+
+colnames(bird_observations_col_rename)
+
+#combine everything
+
+bird_survey_taxon_site_1 <- left_join(bird_observations_col_rename, taxalist, by = "species_id")
+
+bird_survey_taxon_site_2 <- left_join(bird_survey_taxon_site_1, sites, by = "site_id")
+
+bird_survey_taxon_site_3 <- left_join(bird_survey_taxon_site_2, surveys)
+
+all_data <- bird_survey_taxon_site_3 %>% 
+  select("survey_date", "common_name", "park_name", "bird_count")
+
+# do it all as one sequence
+
+birds_left_join_all <- bird_observations_col_rename %>% 
+  left_join(taxalist, by = "species_id") %>% 
+  left_join(sites, by = "site_id") %>% 
+  left_join(surveys) %>% 
+  select("survey_date", "common_name", "park_name", "bird_count")
+
+```
+
+```{r}
+all_data_w_month <- birds_left_join_all %>% 
+  mutate(survey_month = lubridate::month(survey_date)) %>% 
+  mutate(survey_month = as.factor(survey_month)) %>% 
+  dplyr::relocate(survey_month, .after = survey_date)
+
+class(all_data_w_month$survey_month)
+
+#converting this col to a factor is useful because it tells R that the month number is a real sequential factor rather than just a numeric number that describes that obs
+```
+
+```{r}
+birds_obs <-  all_data_w_month %>% 
+  group_by(park_name, survey_month) %>% 
+  summarize(num_park_month = n()) %>% 
+  filter(park_name %in% c("Lindo", "Orme", "Palomino", "Sonrisa"))
+
+```
+
+
+
+
+
+
+
+
+
